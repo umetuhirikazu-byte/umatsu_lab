@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>OpenCV.js デジタル水族館 完全版</title>
+<title>OpenCV デジタル水族館 完全透明版</title>
 
 <!-- p5.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 
-<!-- OpenCV.js 安定版 -->
+<!-- OpenCV.js -->
 <script src="https://docs.opencv.org/4.5.5/opencv.js"></script>
 
 <style>
@@ -188,10 +188,15 @@ function draw(){
             scale(-1,1);
         }
 
+        // 少し上下に揺れる
+        let swimY =
+            sin(frameCount * 0.05 + fish.offset)
+            * 5;
+
         image(
             fish.img,
             -fish.w/2,
-            -fish.h/2,
+            -fish.h/2 + swimY,
             fish.w,
             fish.h
         );
@@ -250,9 +255,19 @@ function captureFish(){
     cv.threshold(
         gray,
         thresh,
-        200,
+        170,
         255,
         cv.THRESH_BINARY_INV
+    );
+
+    // ノイズ除去
+    let kernel = cv.Mat.ones(3,3,cv.CV_8U);
+
+    cv.morphologyEx(
+        thresh,
+        thresh,
+        cv.MORPH_OPEN,
+        kernel
     );
 
     // 輪郭検出
@@ -287,7 +302,7 @@ function captureFish(){
         }
     }
 
-    // 魚検出失敗
+    // 検出失敗
     if(maxIndex == -1){
 
         alert("魚を検出できません");
@@ -297,13 +312,14 @@ function captureFish(){
             gray,
             thresh,
             contours,
-            hierarchy
+            hierarchy,
+            kernel
         );
 
         return;
     }
 
-    // マスク作成
+    // マスク
     let mask =
         new cv.Mat.zeros(
             src.rows,
@@ -329,10 +345,40 @@ function captureFish(){
         mask
     );
 
-    // バウンディングBOX
+    // RGBA化
+    cv.cvtColor(
+        result,
+        result,
+        cv.COLOR_RGB2RGBA
+    );
+
+    // Alpha適用
+    for(let y=0; y<mask.rows; y++){
+
+        for(let x=0; x<mask.cols; x++){
+
+            let maskValue =
+                mask.ucharPtr(y,x)[0];
+
+            let pixel =
+                result.ucharPtr(y,x);
+
+            if(maskValue == 0){
+
+                pixel[3] = 0;
+
+            }else{
+
+                pixel[3] = 255;
+            }
+        }
+    }
+
+    // 最大輪郭
     let cnt =
         contours.get(maxIndex);
 
+    // バウンディングBOX
     let rect =
         cv.boundingRect(cnt);
 
@@ -368,6 +414,8 @@ function captureFish(){
 
         direction:random([1,-1]),
 
+        offset:random(1000),
+
         w:rect.width * 0.7,
 
         h:rect.height * 0.7
@@ -380,6 +428,7 @@ function captureFish(){
         thresh,
         contours,
         hierarchy,
+        kernel,
         mask,
         result,
         roi
@@ -387,10 +436,22 @@ function captureFish(){
 }
 
 // --------------------
-// 背景
+// 海背景
 // --------------------
 
 function drawOcean(){
+
+    // グラデーション風
+    for(let y=0;y<height;y+=5){
+
+        stroke(
+            0,
+            80 + y*0.2,
+            150 + y*0.1
+        );
+
+        line(0,y,width,y);
+    }
 
     // 泡
     noStroke();
