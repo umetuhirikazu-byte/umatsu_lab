@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>デジタル水族館</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
+<style>
+body{
+    margin:0;
+    background:#001f3f;
+    color:white;
+    font-family:sans-serif;
+    text-align:center;
+}
+
+h1{
+    margin:10px;
+}
+
+#controls{
+    margin:10px;
+}
+
+video{
+    width:320px;
+    border-radius:10px;
+    border:3px solid white;
+}
+
+button{
+    padding:10px 20px;
+    font-size:18px;
+    border:none;
+    border-radius:10px;
+    background:#00aaff;
+    color:white;
+    cursor:pointer;
+    margin-top:10px;
+}
+
+canvas{
+    display:block;
+    margin:auto;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🐟 デジタル水族館 🐠</h1>
+
+<div id="controls">
+    <video id="video" autoplay playsinline></video>
+    <br>
+    <button onclick="captureFish()">魚を撮影</button>
+</div>
+
+<script>
+
+let fishes = [];
+let captureCanvas;
+let ctx;
+let video;
+
+async function setupCamera(){
+
+    video = document.getElementById("video");
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video:true,
+        audio:false
+    });
+
+    video.srcObject = stream;
+}
+
+setupCamera();
+
+function setup(){
+    let cnv = createCanvas(window.innerWidth, 500);
+    cnv.parent(document.body);
+
+    captureCanvas = document.createElement("canvas");
+    captureCanvas.width = 320;
+    captureCanvas.height = 240;
+
+    ctx = captureCanvas.getContext("2d");
+}
+
+function draw(){
+
+    background(0,80,150);
+
+    drawBubbles();
+
+    for(let fish of fishes){
+
+        fish.x += fish.speed * fish.direction;
+
+        if(fish.x > width + 100){
+            fish.direction = -1;
+        }
+
+        if(fish.x < -100){
+            fish.direction = 1;
+        }
+
+        push();
+
+        translate(fish.x, fish.y);
+
+        if(fish.direction == -1){
+            scale(-1,1);
+        }
+
+        image(fish.img, -50, -30, 100, 60);
+
+        pop();
+    }
+}
+
+function captureFish(){
+
+    ctx.drawImage(video,0,0,320,240);
+
+    let imageData = ctx.getImageData(0,0,320,240);
+    let data = imageData.data;
+
+    // 白背景透明化
+    for(let i=0; i<data.length; i+=4){
+
+        let r = data[i];
+        let g = data[i+1];
+        let b = data[i+2];
+
+        if(r > 220 && g > 220 && b > 220){
+            data[i+3] = 0;
+        }
+    }
+
+    ctx.putImageData(imageData,0,0);
+
+    let fishImg = createImg(captureCanvas.toDataURL(),"fish");
+
+    fishImg.hide();
+
+    fishes.push({
+        img:fishImg,
+        x:random(width),
+        y:random(100,450),
+        speed:random(1,3),
+        direction:random([1,-1])
+    });
+}
+
+function drawBubbles(){
+
+    noStroke();
+
+    for(let i=0;i<20;i++){
+
+        fill(255,255,255,100);
+
+        circle(
+            (frameCount*i*0.7)%width,
+            height - (frameCount*i*0.5)%height,
+            random(5,15)
+        );
+    }
+}
+
+function windowResized(){
+    resizeCanvas(window.innerWidth,500);
+}
+
+</script>
+
+</body>
+</html>
