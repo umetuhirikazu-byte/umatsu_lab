@@ -82,7 +82,7 @@ canvas{
     </button>
 
     <div id="status">
-        OpenCV.js 読み込み中...
+        ✅ OpenCV.js 読み込み完了
     </div>
 
 </div>
@@ -92,8 +92,6 @@ canvas{
 let fishes = [];
 
 let video;
-
-let cvReady = false;
 
 // --------------------
 // カメラ開始
@@ -115,32 +113,6 @@ async function setupCamera(){
 }
 
 setupCamera();
-
-// --------------------
-// OpenCV待機
-// --------------------
-
-function waitForOpenCV(){
-
-    if(typeof cv !== "undefined"){
-
-        if(cv.Mat){
-
-            cvReady = true;
-
-            document.getElementById("status").innerHTML =
-                "✅ OpenCV.js 読み込み完了";
-
-            console.log("OpenCV Ready");
-
-            return;
-        }
-    }
-
-    setTimeout(waitForOpenCV,500);
-}
-
-waitForOpenCV();
 
 // --------------------
 // p5 setup
@@ -170,7 +142,7 @@ function draw(){
 
         fish.x += fish.speed * fish.direction;
 
-        // 左右反転
+        // 反転
         if(fish.x > width + fish.w){
 
             fish.direction = -1;
@@ -198,7 +170,7 @@ function draw(){
 
         noTint();
 
-        // 魚向き
+        // 向き
         if(fish.direction == -1){
 
             scale(-1,1);
@@ -226,12 +198,6 @@ function draw(){
 // --------------------
 
 function captureFish(){
-
-    if(!cvReady){
-
-        alert("OpenCV.js 読み込み中です");
-        return;
-    }
 
     // 一時Canvas
     let tempCanvas =
@@ -323,7 +289,7 @@ function captureFish(){
         }
     }
 
-    // 失敗
+    // 検出失敗
     if(maxIndex == -1){
 
         alert("魚を検出できません");
@@ -367,14 +333,17 @@ function captureFish(){
         mask
     );
 
-    // RGBA変換
+    // RGBA化
     cv.cvtColor(
         result,
         result,
         cv.COLOR_RGB2RGBA
     );
 
-    // Alpha設定
+    // --------------------
+    // 白部分透明化
+    // --------------------
+
     for(let y=0; y<mask.rows; y++){
 
         for(let x=0; x<mask.cols; x++){
@@ -385,13 +354,30 @@ function captureFish(){
             let pixel =
                 result.ucharPtr(y,x);
 
+            let r = pixel[0];
+            let g = pixel[1];
+            let b = pixel[2];
+
+            // 背景透明
             if(maskValue == 0){
 
                 pixel[3] = 0;
 
             }else{
 
-                pixel[3] = 255;
+                // 白っぽい部分透明
+                if(
+                    r > 220 &&
+                    g > 220 &&
+                    b > 220
+                ){
+
+                    pixel[3] = 0;
+
+                }else{
+
+                    pixel[3] = 255;
+                }
             }
         }
     }
@@ -404,7 +390,7 @@ function captureFish(){
     let rect =
         cv.boundingRect(cnt);
 
-    // 切り抜き
+    // ROI
     let roi =
         result.roi(rect);
 
@@ -414,11 +400,11 @@ function captureFish(){
 
     cv.imshow(outCanvas, roi);
 
-    // PNG化
+    // PNG URL
     let imageURL =
         outCanvas.toDataURL("image/png");
 
-    // ここが超重要
+    // p5 loadImage
     loadImage(
 
         imageURL,
